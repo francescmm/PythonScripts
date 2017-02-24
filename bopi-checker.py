@@ -13,7 +13,7 @@ def getWebsource(url, encoding):
       pageSource = str(response.read(), encoding)
    else:
       pageSource = str(response.read())
-      
+
    return pageSource
 
 # Gets the substring between to patterns
@@ -37,7 +37,7 @@ def getAllImagesFromXml(xmlStream, date):
       xmlStream = xmlStream[startIndex + len(startText) + len(imgSrc) + len(endText):]
       
       imgdata = base64.b64decode(imgSrc)
-      filename = date + "\\img_" + str(imgIndex) + ".jpg"
+      filename = "images\\" + date + "\\img_" + str(imgIndex) + ".jpg"
 
       os.makedirs(os.path.dirname(filename), exist_ok = True)
       with open(filename, 'wb') as f:
@@ -51,18 +51,21 @@ def getAllImagesFromXml(xmlStream, date):
 # Returns any of the strings we set are in today's BOPI. Otherwise it returns false.
 # If today there isn't BOPI, it informs about that.
 def isTextInTodaysBOPI(strings, date):
-   print ("Accessing to the OEPM to get the BOPI...\n")
-
+   print ("====================== START ======================")
+   print ("Accessing to the OEPM to get the BOPI of %s...\n" % date)
+   
    day = 0
+   
    if (len(date) != 0):
+      repeat = True;
       day = datetime.datetime.strptime(date, '%d-%m-%Y').weekday()
    else:
       day = datetime.datetime.now().weekday()
-
+         
    if day >= 0 and day < 5:
       if len(date) == 0:
-        date = datetime.datetime.now().strftime('%d-%m-%Y')
-
+         date = datetime.datetime.now().strftime('%d-%m-%Y')
+        
       url = "https://sede.oepm.gob.es/bopiweb/descargaPublicaciones/resultBusqueda.action?fecha=" + date
       pageSource = getWebsource(url, 'utf-8')
 
@@ -94,23 +97,29 @@ def isTextInTodaysBOPI(strings, date):
             print (f, " not found")
             
       print ("Saving the XML file in local filesystem...\n")
-      with open("bopi_" + date + ".xml", 'w') as f:
+      
+      filename = "bopi\\bopi_" + date + ".xml"
+      os.makedirs(os.path.dirname(filename), exist_ok = True)
+      
+      with open(filename, 'w') as f:
          f.write(findText)
          
       getAllImagesFromXml(findText, date)
    else:
-      print ("Today there is no BOPI")
+      print ("There is no BOPI.")
       
-#isTextInTodaysBOPI(sys.argv[1:])
+   print("======================= END =======================\n\n\n")
 
 def main(argv):
    startDate = ''
    words = []
+   allFrom = False
    try:
-      opts, args = getopt.getopt(argv,"hd:w:",["date=","words="])
+      opts, args = getopt.getopt(argv,"hd:rw:",["date=","words=","recursive"])
    except getopt.GetoptError:
       print ('bopi-checker.py -d <startDate format dd-MM-yyyy> -w <words separated by comma>')
       sys.exit(2)
+      
    for opt, arg in opts:
       if opt == '-h':
          print ('bopi-checker.py -d <startDate format dd-MM-yyyy> -w <words separated by comma>')
@@ -124,12 +133,24 @@ def main(argv):
             sys.exit()
       elif opt in ("-w", "--words"):
          words = arg.split(",")
+      elif opt in ("-r", "--recursive"):
+         allFrom = True;
    
    if len(words) == 0:
       print ('\nThere is nothing to search. Please set some words separated by commas.')
       sys.exit()
-			
-   isTextInTodaysBOPI(words, startDate)
+
+   repeat = len(startDate) != 0
+   userDate = datetime.datetime.strptime(startDate, '%d-%m-%Y')
+   
+   while userDate < datetime.datetime.now():
+      startDate = datetime.datetime.strftime(userDate, '%d-%m-%Y')
+      isTextInTodaysBOPI(words, startDate)
+      
+      if allFrom:
+         userDate += datetime.timedelta(days = 1)
+      else:
+         userDate = datetime.datetime.now()
 
 if __name__ == "__main__":
    main(sys.argv[1:])
