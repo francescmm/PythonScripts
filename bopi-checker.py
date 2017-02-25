@@ -1,8 +1,20 @@
 from urllib.request import urlopen
 import datetime
-import sys, getopt, re, binascii
+import sys, getopt, re, binascii, threading
 import base64
 import os
+
+class StoreImagesThread(threading.Thread):
+    def __init__(self, id,  strings, date):
+        self.id = id
+        self.strings = strings
+        self.date = date
+        threading.Thread.__init__(self)
+
+    def run(self):
+        print ("Starting thread for day", self.date)
+        isTextInTodaysBOPI(self.strings, self.date)
+        print ("Ending thread", self.id)
 
 # Gets the content of a webpage or web resource
 def getWebsource(url, encoding):
@@ -54,6 +66,18 @@ def getAllImagesFromXml(xmlStream, date):
       except binascii.Error:
           print ("Image format invalid.")
 
+def printFoundStrings(text, strings):
+    found = False
+
+    for f in strings:
+        if text.find(str(f).upper()) != -1 or text.find(str(f).lower()) != -1:
+            found = True
+            print (f, " found")
+        else:
+            print (f, " not found")
+
+    return found
+
 
 # Returns any of the strings we set are in today's BOPI. Otherwise it returns false.
 # If today there isn't BOPI, it informs about that.
@@ -98,15 +122,8 @@ def isTextInTodaysBOPI(strings, date):
       
       findText = getWebsource(url, '')
       
-      found = False
+      found = printFoundStrings(findText, strings)
       
-      for f in strings:
-         if findText.find(str(f).upper()) != -1 or findText.find(str(f).lower()) != -1:
-            found = True
-            print (f, " found")
-         else:
-            print (f, " not found")
-            
       print ("Saving the XML file in local filesystem...\n")
       
       filename = "bopi\\bopi_" + date + ".xml"
@@ -116,6 +133,7 @@ def isTextInTodaysBOPI(strings, date):
          f.write(findText)
          
       getAllImagesFromXml(findText, date)
+
    else:
       print ("There is no BOPI.")
       
@@ -153,15 +171,21 @@ def main(argv):
    if repeat:
        userDate = datetime.datetime.strptime(startDate, '%d-%m-%Y')
 
+   count = 1
+
    while userDate <= datetime.datetime.now():
       startDate = datetime.datetime.strftime(userDate, '%d-%m-%Y')
-      isTextInTodaysBOPI(words, startDate)
-      
+
+      imgThread = StoreImagesThread(count, words, startDate)
+      imgThread.start()
+
       if allFrom:
          userDate += datetime.timedelta(days = 1)
       else:
          userDate = datetime.datetime.now()
          userDate += datetime.timedelta(days = 1)
+
+      count += 1
 
 if __name__ == "__main__":
    main(sys.argv[1:])
