@@ -1,20 +1,24 @@
 from urllib.request import urlopen
 import datetime
-import sys, getopt, re
+import sys, getopt, re, binascii
 import base64
 import os
 
 # Gets the content of a webpage or web resource
 def getWebsource(url, encoding):
-   response = urlopen(url)
-   pageSource = ""
+   try:
+       response = urlopen(url)
+       pageSource = ""
    
-   if (len(encoding) > 0):
-      pageSource = str(response.read(), encoding)
-   else:
-      pageSource = str(response.read())
+       if (len(encoding) > 0):
+          pageSource = str(response.read(), encoding)
+       else:
+          pageSource = str(response.read())
 
-   return pageSource
+       return pageSource
+   except UnicodeEncodeError:
+       print ("Error while reading web page: %s", url)
+       return ""
 
 # Gets the substring between to patterns
 def getSubstring(begin, end, text):
@@ -36,16 +40,19 @@ def getAllImagesFromXml(xmlStream, date):
       imgSrc = xmlStream[startIndex + len(startText):endIndex]
       xmlStream = xmlStream[startIndex + len(startText) + len(imgSrc) + len(endText):]
       
-      imgdata = base64.b64decode(imgSrc)
-      filename = "images\\" + date + "\\img_" + str(imgIndex) + ".jpg"
+      try:
+          imgdata = base64.b64decode(imgSrc)
+          filename = "images\\" + date + "\\img_" + str(imgIndex) + ".jpg"
 
-      os.makedirs(os.path.dirname(filename), exist_ok = True)
-      with open(filename, 'wb') as f:
-         f.write(imgdata)
+          os.makedirs(os.path.dirname(filename), exist_ok = True)
+          with open(filename, 'wb') as f:
+             f.write(imgdata)
          
-      imgIndex += 1
-      startIndex = xmlStream.find(startText)
-      endIndex = xmlStream.find(endText)
+          imgIndex += 1
+          startIndex = xmlStream.find(startText)
+          endIndex = xmlStream.find(endText)
+      except binascii.Error:
+          print ("Image format invalid.")
 
 
 # Returns any of the strings we set are in today's BOPI. Otherwise it returns false.
@@ -72,6 +79,10 @@ def isTextInTodaysBOPI(strings, date):
       # We look for the MARCAS section
       print ("Looking for the document ID...\n")
       textSlot = getSubstring("TOMO 1", "TOMO 2", pageSource)
+
+      if textSlot.find("error") != -1:
+          print ("There is no BOPI.")
+          return
       
       # Checking that the file we're looking for is in XML format
       textSlot = getSubstring("en formato PDF", "en formato XML')", textSlot)
@@ -136,14 +147,13 @@ def main(argv):
       elif opt in ("-r", "--recursive"):
          allFrom = True;
    
-   if len(words) == 0:
-      print ('\nThere is nothing to search. Please set some words separated by commas.')
-      sys.exit()
-
    repeat = len(startDate) != 0
-   userDate = datetime.datetime.strptime(startDate, '%d-%m-%Y')
-   
-   while userDate < datetime.datetime.now():
+   userDate = datetime.datetime.now()
+
+   if repeat:
+       userDate = datetime.datetime.strptime(startDate, '%d-%m-%Y')
+
+   while userDate <= datetime.datetime.now():
       startDate = datetime.datetime.strftime(userDate, '%d-%m-%Y')
       isTextInTodaysBOPI(words, startDate)
       
@@ -151,6 +161,7 @@ def main(argv):
          userDate += datetime.timedelta(days = 1)
       else:
          userDate = datetime.datetime.now()
+         userDate += datetime.timedelta(days = 1)
 
 if __name__ == "__main__":
    main(sys.argv[1:])
