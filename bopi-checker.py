@@ -85,6 +85,9 @@ class StoreImagesThread(threading.Thread):
           findText = getWebsource(url, '')
       
           found = printFoundStrings(findText, self.strings)
+          
+          if found:
+             logging.info("{%d} Results found on %s" % (self.id, self.date))
       
           logging.info("{%d} Saving the XML file in local filesystem" % self.id)
       
@@ -117,7 +120,7 @@ def getWebsource(url, encoding):
 
        return pageSource
    except UnicodeEncodeError:
-       print ("Error while reading web page: %s", url)
+       logging.error("Error while reading web page: %s" % url)
        return ""
 
 # Gets the substring between to patterns
@@ -127,16 +130,11 @@ def getSubstring(begin, end, text):
    return (text[startIndex + len(begin):endIndex])
 
 def printFoundStrings(text, strings):
-    found = False
-
     for f in strings:
         if text.find(str(f).upper()) != -1 or text.find(str(f).lower()) != -1:
-            found = True
-            print(f, " found")
-        else:
-            print(f, " not found")
+            return True
 
-    return found
+    return False
 
 def main(argv):
    startDate = ''
